@@ -237,7 +237,7 @@ function App() {
 
         <p className="muted">
           <strong>{game.label}</strong>: pick {game.mainCount} main number{game.mainCount > 1 ? 's' : ''} from 1 to {game.maxNumber}
-          {game.hasBonus ? '. A bonus number is shown separately.' : '. No bonus number for this quick pick.'}
+          {game.hasBonus ? '. Includes a bonus number.' : '. No bonus number for this quick pick.'}
         </p>
 
         <div className="actions">
@@ -311,21 +311,12 @@ function App() {
                   {n}
                 </div>
               ))}
-            </div>
-
-            {pick.rules?.hasBonus && pick.bonus != null && (
-              <>
-                <div className="numbers" style={{ marginTop: '0.9rem' }}>
-                  <div className="ball bonus reveal" style={{ animationDelay: `${pick.numbers.length * 90}ms` }}>
-                    B {pick.bonus}
-                  </div>
+              {pick.rules?.hasBonus && pick.bonus != null && (
+                <div className="ball bonus reveal" style={{ animationDelay: `${pick.numbers.length * 90}ms` }}>
+                  B {pick.bonus}
                 </div>
-
-                <p className="muted">
-                  <strong>{pick.rules?.bonusLabel || 'Bonus Number'}:</strong> {pick.bonus}. This is shown separately so it does not look like an extra number in your main line.
-                </p>
-              </>
-            )}
+              )}
+            </div>
 
             <p className="muted">{pick.note}</p>
           </section>
