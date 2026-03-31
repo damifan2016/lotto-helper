@@ -64,6 +64,10 @@ const cache = {
 
 async function refreshWhereSoldCache() {
   try {
+    if (typeof fetch !== 'function') {
+      throw new Error('Global fetch is unavailable in this runtime');
+    }
+
     const res = await fetch(OLG_WHERE_SOLD_URL, {
       headers: { 'user-agent': 'Mozilla/5.0 (LottoHelper/1.0)' }
     });

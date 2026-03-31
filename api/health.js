@@ -1,5 +1,9 @@
 import { sendJson } from '../apps/api/lib/lotto.js';
 
 export default async function handler(_req, res) {
-  sendJson(res, 200, { ok: true });
+  try {
+    sendJson(res, 200, { ok: true });
+  } catch (err) {
+    sendJson(res, 500, { ok: false, error: err?.message || String(err) });
+  }
 }
