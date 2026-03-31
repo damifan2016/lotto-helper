@@ -28,6 +28,7 @@ export default async function handler(_req, res) {
       rules: {
         mainCount: 6,
         maxNumber: 49,
+        hasBonus: true,
         bonusLabel: 'Bonus Number'
       },
       numbers,
