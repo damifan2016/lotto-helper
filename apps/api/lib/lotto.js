@@ -6,7 +6,8 @@ const GAME_CONFIG = {
     label: 'Lotto Max',
     mainCount: 7,
     maxNumber: 50,
-    bonusLabel: 'Bonus Number',
+    hasBonus: false,
+    bonusLabel: null,
     note: 'Random quick pick for fun. Not a prediction.'
   },
   lotto649: {
@@ -14,6 +15,7 @@ const GAME_CONFIG = {
     label: 'Lotto 6/49',
     mainCount: 6,
     maxNumber: 49,
+    hasBonus: true,
     bonusLabel: 'Bonus Number',
     note: 'Random quick pick for fun. Not a prediction.'
   }
@@ -143,13 +145,14 @@ async function getCachedStoreData(force = false) {
 function buildPickResponse(gameKey = 'lottomax') {
   const game = getGameConfig(gameKey);
   const numbers = pickNumbers(game.mainCount, game.maxNumber);
-  const bonus = pickBonus(numbers, game.maxNumber);
+  const bonus = game.hasBonus ? pickBonus(numbers, game.maxNumber) : null;
   return {
     game: game.label,
     gameKey: game.key,
     rules: {
       mainCount: game.mainCount,
       maxNumber: game.maxNumber,
+      hasBonus: game.hasBonus,
       bonusLabel: game.bonusLabel
     },
     numbers,

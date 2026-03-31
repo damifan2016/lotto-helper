@@ -13,7 +13,8 @@ const GAME_OPTIONS = {
     label: 'Lotto Max',
     mainCount: 7,
     maxNumber: 50,
-    bonusLabel: 'Bonus Number',
+    hasBonus: false,
+    bonusLabel: null,
     pickPath: '/lottomax/pick',
     supportsStore: true,
     heroTitle: 'Lotto Lucky Helper',
@@ -24,6 +25,7 @@ const GAME_OPTIONS = {
     label: 'Lotto 6/49',
     mainCount: 6,
     maxNumber: 49,
+    hasBonus: true,
     bonusLabel: 'Bonus Number',
     pickPath: '/lotto649/pick',
     supportsStore: false,
@@ -126,11 +128,11 @@ function App() {
       }
 
       const finalNumbers = merged.slice(0, game.mainCount).sort((a, b) => a - b);
-
-      let finalBonus = base.bonus;
-      if (!finalBonus || finalNumbers.includes(finalBonus)) {
-        finalBonus = randomUniqueFromRange(1, game.maxNumber, finalNumbers)[0];
-      }
+      const finalBonus = game.hasBonus
+        ? (!base.bonus || finalNumbers.includes(base.bonus)
+            ? randomUniqueFromRange(1, game.maxNumber, finalNumbers)[0]
+            : base.bonus)
+        : null;
 
       setPick({
         ...base,
@@ -211,7 +213,7 @@ function App() {
         <p className="kicker">🍀 tonight could be your night</p>
         <h1>{game.heroTitle}</h1>
         <p className="muted">
-          Switch between Lotto Max and Lotto 6/49, generate a quick line, and keep the bonus number clearly separate from your main picks.
+          Switch between Lotto Max and Lotto 6/49, generate a quick line, and follow each game's actual pick format.
         </p>
 
         <div className="actions">
@@ -232,7 +234,8 @@ function App() {
         </div>
 
         <p className="muted">
-          <strong>{game.label}</strong>: pick {game.mainCount} main number{game.mainCount > 1 ? 's' : ''} from 1 to {game.maxNumber}. The bonus number is shown separately as draw reference.
+          <strong>{game.label}</strong>: pick {game.mainCount} main number{game.mainCount > 1 ? 's' : ''} from 1 to {game.maxNumber}
+          {game.hasBonus ? '. A bonus number is shown separately.' : '. No bonus number for this quick pick.'}
         </p>
 
         <div className="actions">
@@ -308,15 +311,20 @@ function App() {
               ))}
             </div>
 
-            <div className="numbers" style={{ marginTop: '0.9rem' }}>
-              <div className="ball bonus reveal" style={{ animationDelay: `${pick.numbers.length * 90}ms` }}>
-                B {pick.bonus}
-              </div>
-            </div>
+            {pick.rules?.hasBonus && pick.bonus != null && (
+              <>
+                <div className="numbers" style={{ marginTop: '0.9rem' }}>
+                  <div className="ball bonus reveal" style={{ animationDelay: `${pick.numbers.length * 90}ms` }}>
+                    B {pick.bonus}
+                  </div>
+                </div>
 
-            <p className="muted">
-              <strong>{pick.rules?.bonusLabel || 'Bonus Number'}:</strong> {pick.bonus}. This is shown separately so it does not look like an extra number in your main line.
-            </p>
+                <p className="muted">
+                  <strong>{pick.rules?.bonusLabel || 'Bonus Number'}:</strong> {pick.bonus}. This is shown separately so it does not look like an extra number in your main line.
+                </p>
+              </>
+            )}
+
             <p className="muted">{pick.note}</p>
           </section>
         )}
