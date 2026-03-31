@@ -1,9 +1,6 @@
-import { sendJson } from '../apps/api/lib/lotto.js';
-
 export default async function handler(_req, res) {
-  try {
-    sendJson(res, 200, { ok: true });
-  } catch (err) {
-    sendJson(res, 500, { ok: false, error: err?.message || String(err) });
-  }
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.end(JSON.stringify({ ok: true }));
 }
