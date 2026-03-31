@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client';
 
 const API =
   import.meta.env.VITE_API_BASE_URL ||
-  `${window.location.protocol}//${window.location.hostname}:3002/api`;
+  (import.meta.env.DEV
+    ? `${window.location.protocol}//${window.location.hostname}:3002/api`
+    : '/api');
 const FAV_KEY = 'lotto-favorite-numbers-v1';
 
 function App() {

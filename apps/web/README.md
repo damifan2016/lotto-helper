@@ -16,16 +16,11 @@ Create an `.env` file if needed:
 VITE_API_BASE_URL=http://localhost:3002/api
 ```
 
-If `VITE_API_BASE_URL` is not set, the app falls back to:
+Behavior:
 
-- `http(s)://<current-host>:3002/api`
+- in local dev, if `VITE_API_BASE_URL` is not set, the app falls back to `http(s)://<current-host>:3002/api`
+- in production, if `VITE_API_BASE_URL` is not set, the app falls back to same-origin `/api`
 
 ## Deployment
 
-For Vercel, set:
-
-- Root Directory: `apps/web`
-- Build Command: `npm run dev -w @lotto/web` is for local dev only; for production you should use Vite build defaults or add a build script.
-- Environment Variable: `VITE_API_BASE_URL=https://YOUR-API-DOMAIN/api`
-
-This app is intended to be deployed separately from the API.
+This app is now intended to work with Vercel-only deployment using root-level Vercel API routes.

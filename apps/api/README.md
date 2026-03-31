@@ -1,6 +1,6 @@
 # @lotto/api
 
-Express API for Lotto Helper.
+Lotto Helper API logic.
 
 ## Local development
 
@@ -8,16 +8,19 @@ Express API for Lotto Helper.
 npm run dev -w @lotto/api
 ```
 
-## Production
+This starts the local Express server for development.
 
-```bash
-npm run start -w @lotto/api
-```
+## Production / Vercel
 
-Environment variables:
+Production requests are handled by root-level Vercel functions in:
 
-- `API_PORT` — optional local override (defaults to `3002`)
-- `PORT` — many hosts provide this automatically
+- `api/health.js`
+- `api/lottomax/pick.js`
+- `api/lottomax/recent-winning-store.js`
+
+Shared logic lives in:
+
+- `apps/api/lib/lotto.js`
 
 ## Endpoints
 
@@ -25,12 +28,6 @@ Environment variables:
 - `GET /api/lottomax/pick`
 - `GET /api/lottomax/recent-winning-store`
 
-## Deployment notes
+## Notes
 
-This API is suitable for Node app hosts like Railway/Render/Fly.
-
-Current implementation uses:
-- an in-memory cache
-- a 30 minute refresh timer
-
-That is fine for a small always-on Node host, but not ideal for purely serverless environments.
+The serverless version uses request-driven refresh with in-memory cache when warm. It does not rely on a long-running timer.
