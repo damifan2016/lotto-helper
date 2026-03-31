@@ -21,7 +21,11 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.get('/api/lottomax/pick', (_req, res) => {
-  sendJson(res, 200, buildPickResponse());
+  sendJson(res, 200, buildPickResponse('lottomax'));
+});
+
+app.get('/api/lotto649/pick', (_req, res) => {
+  sendJson(res, 200, buildPickResponse('lotto649'));
 });
 
 app.get('/api/lottomax/recent-winning-store', async (req, res) => {

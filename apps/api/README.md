@@ -26,8 +26,11 @@ Shared logic lives in:
 
 - `GET /api/health`
 - `GET /api/lottomax/pick`
+- `GET /api/lotto649/pick`
 - `GET /api/lottomax/recent-winning-store`
 
 ## Notes
 
-The serverless version uses request-driven refresh with in-memory cache when warm. It does not rely on a long-running timer.
+- Pick responses now support both Lotto Max and Lotto 6/49.
+- The Lotto Max winning-store endpoint remains Lotto Max specific for now.
+- The serverless version uses request-driven refresh with in-memory cache when warm. It does not rely on a long-running timer.

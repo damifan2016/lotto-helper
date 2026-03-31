@@ -6,50 +6,98 @@ const API =
   (import.meta.env.DEV
     ? `${window.location.protocol}//${window.location.hostname}:3002/api`
     : '/api');
-const FAV_KEY = 'lotto-favorite-numbers-v1';
+
+const GAME_OPTIONS = {
+  lottomax: {
+    key: 'lottomax',
+    label: 'Lotto Max',
+    mainCount: 7,
+    maxNumber: 50,
+    bonusLabel: 'Bonus Number',
+    pickPath: '/lottomax/pick',
+    supportsStore: true,
+    heroTitle: 'Lotto Lucky Helper',
+    quickPickLabel: '🎲 Lotto Max Quick Pick'
+  },
+  lotto649: {
+    key: 'lotto649',
+    label: 'Lotto 6/49',
+    mainCount: 6,
+    maxNumber: 49,
+    bonusLabel: 'Bonus Number',
+    pickPath: '/lotto649/pick',
+    supportsStore: false,
+    heroTitle: 'Lotto Lucky Helper',
+    quickPickLabel: '🎲 Lotto 6/49 Quick Pick'
+  }
+};
+
+const FAV_KEY_PREFIX = 'lotto-favorite-numbers-v2';
 
 function App() {
+  const [gameKey, setGameKey] = useState('lottomax');
+  const game = GAME_OPTIONS[gameKey] || GAME_OPTIONS.lottomax;
+  const favKey = `${FAV_KEY_PREFIX}-${gameKey}`;
+
   const [pick, setPick] = useState(null);
   const [store, setStore] = useState(null);
   const [loadingPick, setLoadingPick] = useState(false);
   const [loadingStore, setLoadingStore] = useState(false);
   const [showStoreDetails, setShowStoreDetails] = useState(false);
   const [revealTick, setRevealTick] = useState(0);
-  const [favorites, setFavorites] = useState(() => {
-    try {
-      const raw = localStorage.getItem(FAV_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed.slice(0, 7) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [favorites, setFavorites] = useState([]);
   const [showFavoritePanel, setShowFavoritePanel] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(favKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const cleaned = Array.isArray(parsed)
+        ? parsed
+            .filter((n) => Number.isInteger(n) && n >= 1 && n <= game.maxNumber)
+            .slice(0, game.mainCount)
+            .sort((a, b) => a - b)
+        : [];
+      setFavorites(cleaned);
+    } catch {
+      setFavorites([]);
+    }
+  }, [favKey, game.maxNumber, game.mainCount]);
+
+  useEffect(() => {
+    localStorage.setItem(favKey, JSON.stringify(favorites));
+  }, [favKey, favorites]);
+
+  const randomUniqueFromRange = (count, maxNumber, excluded = []) => {
+    const out = [];
+    const blocked = new Set(excluded);
+    while (out.length < count) {
+      const n = Math.floor(Math.random() * maxNumber) + 1;
+      if (blocked.has(n) || out.includes(n)) continue;
+      out.push(n);
+    }
+    return out;
+  };
+
+  const fetchPick = async () => {
+    const r = await fetch(`${API}${game.pickPath}`);
+    if (!r.ok) throw new Error('pick-request-failed');
+    return r.json();
+  };
 
   const generatePick = async () => {
     setError('');
     setLoadingPick(true);
     try {
-      const r = await fetch(`${API}/lottomax/pick`);
-      setPick(await r.json());
+      const data = await fetchPick();
+      setPick(data);
       setRevealTick((t) => t + 1);
     } catch {
-      setError('Could not generate numbers.');
+      setError(`Could not generate ${game.label} numbers.`);
     } finally {
       setLoadingPick(false);
     }
-  };
-
-  const randomUniqueFromRange = (count, excluded = []) => {
-    const out = [];
-    const blocked = new Set(excluded);
-    while (out.length < count) {
-      const n = Math.floor(Math.random() * 50) + 1;
-      if (blocked.has(n) || out.includes(n)) continue;
-      out.push(n);
-    }
-    return out;
   };
 
   const generateFavoriteMix = async () => {
@@ -62,28 +110,26 @@ function App() {
     setLoadingPick(true);
 
     try {
-      const r = await fetch(`${API}/lottomax/pick`);
-      const base = await r.json();
+      const base = await fetchPick();
 
       const favPool = [...favorites].sort(() => Math.random() - 0.5);
-      const guaranteedFavorites = favPool.slice(0, Math.min(7, favPool.length));
-
+      const guaranteedFavorites = favPool.slice(0, Math.min(game.mainCount, favPool.length));
       const merged = [...guaranteedFavorites];
 
       for (const n of (base.numbers || [])) {
-        if (merged.length >= 7) break;
+        if (merged.length >= game.mainCount) break;
         if (!merged.includes(n)) merged.push(n);
       }
 
-      if (merged.length < 7) {
-        merged.push(...randomUniqueFromRange(7 - merged.length, merged));
+      if (merged.length < game.mainCount) {
+        merged.push(...randomUniqueFromRange(game.mainCount - merged.length, game.maxNumber, merged));
       }
 
-      const finalNumbers = merged.slice(0, 7).sort((a, b) => a - b);
+      const finalNumbers = merged.slice(0, game.mainCount).sort((a, b) => a - b);
 
       let finalBonus = base.bonus;
       if (!finalBonus || finalNumbers.includes(finalBonus)) {
-        finalBonus = randomUniqueFromRange(1, finalNumbers)[0];
+        finalBonus = randomUniqueFromRange(1, game.maxNumber, finalNumbers)[0];
       }
 
       setPick({
@@ -95,17 +141,23 @@ function App() {
 
       setRevealTick((t) => t + 1);
     } catch {
-      setError('Could not generate favorite mix.');
+      setError(`Could not generate a ${game.label} favorites mix.`);
     } finally {
       setLoadingPick(false);
     }
   };
 
   const loadStore = async (force = false) => {
+    if (!game.supportsStore) {
+      setStore(null);
+      return;
+    }
+
     setError('');
     setLoadingStore(true);
     try {
       const r = await fetch(`${API}/lottomax/recent-winning-store${force ? '?force=1' : ''}`);
+      if (!r.ok) throw new Error('store-request-failed');
       setStore(await r.json());
     } catch {
       setError('Could not fetch recent winning store.');
@@ -115,19 +167,22 @@ function App() {
   };
 
   useEffect(() => {
-    localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
-  }, [favorites]);
-
-  useEffect(() => {
-    loadStore(false);
-    const timer = setInterval(() => loadStore(false), 5 * 60 * 1000);
-    return () => clearInterval(timer);
-  }, []);
+    setPick(null);
+    setError('');
+    setShowStoreDetails(false);
+    if (game.supportsStore) {
+      loadStore(false);
+      const timer = setInterval(() => loadStore(false), 5 * 60 * 1000);
+      return () => clearInterval(timer);
+    }
+    setStore(null);
+    return undefined;
+  }, [gameKey]);
 
   const toggleFavorite = (n) => {
     setFavorites((curr) => {
       if (curr.includes(n)) return curr.filter((x) => x !== n);
-      if (curr.length >= 7) return curr;
+      if (curr.length >= game.mainCount) return curr;
       return [...curr, n].sort((a, b) => a - b);
     });
   };
@@ -139,8 +194,6 @@ function App() {
     return `${s} • ${l}`;
   }, [store]);
 
-  const displayedFavorites = favorites;
-
   return (
     <main className="app-shell">
       <div className="bg-orb orb-a" />
@@ -149,39 +202,62 @@ function App() {
 
       <section className="jackpot-ticker glass" aria-label="jackpot ticker">
         <div className="ticker-track">
-          <span>💰 Dream big • Pick smart • Stay lucky • Lotto Max Night • Fortune favors the brave • </span>
-          <span>💰 Dream big • Pick smart • Stay lucky • Lotto Max Night • Fortune favors the brave • </span>
+          <span>💰 Dream big • Pick smart • Stay lucky • Lotto night • Fortune favors the brave • </span>
+          <span>💰 Dream big • Pick smart • Stay lucky • Lotto night • Fortune favors the brave • </span>
         </div>
       </section>
 
       <section className="hero glass">
         <p className="kicker">🍀 tonight could be your night</p>
-        <h1>Lotto Max Lucky Helper</h1>
+        <h1>{game.heroTitle}</h1>
         <p className="muted">
-          Quick picks, quick insights — no clutter. Tap, check, and get back to dreaming big.
+          Switch between Lotto Max and Lotto 6/49, generate a quick line, and keep the bonus number clearly separate from your main picks.
+        </p>
+
+        <div className="actions">
+          <button
+            className={`btn ${gameKey === 'lottomax' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setGameKey('lottomax')}
+            disabled={loadingPick || loadingStore}
+          >
+            Lotto Max
+          </button>
+          <button
+            className={`btn ${gameKey === 'lotto649' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setGameKey('lotto649')}
+            disabled={loadingPick || loadingStore}
+          >
+            Lotto 6/49
+          </button>
+        </div>
+
+        <p className="muted">
+          <strong>{game.label}</strong>: pick {game.mainCount} main number{game.mainCount > 1 ? 's' : ''} from 1 to {game.maxNumber}. The bonus number is shown separately as draw reference.
         </p>
 
         <div className="actions">
           <button className="btn btn-primary" onClick={generatePick} disabled={loadingPick}>
-            {loadingPick ? 'Generating...' : '🎲 Lucky 7 Quick Pick'}
+            {loadingPick ? 'Generating...' : game.quickPickLabel}
           </button>
           <button className="btn btn-favorite" onClick={generateFavoriteMix} disabled={loadingPick || !favorites.length}>
             {loadingPick ? 'Generating...' : '⭐ Use My Favorites Mix'}
           </button>
-          <button className="btn btn-secondary" onClick={() => loadStore(true)} disabled={loadingStore}>
-            {loadingStore ? 'Loading...' : '📍 Refresh Winner Spot'}
-          </button>
+          {game.supportsStore && (
+            <button className="btn btn-secondary" onClick={() => loadStore(true)} disabled={loadingStore}>
+              {loadingStore ? 'Loading...' : '📍 Refresh Winner Spot'}
+            </button>
+          )}
         </div>
       </section>
 
       <section className="card glass fav-card">
         <div className="card-header">
           <h3>⭐ Favorite Numbers</h3>
-          <span className="chip gold">{favorites.length}/7 pinned</span>
+          <span className="chip gold">{favorites.length}/{game.mainCount} pinned</span>
         </div>
 
         <div className="fav-summary-row">
-          <p className="muted fav-summary">Pinned: {displayedFavorites.length ? displayedFavorites.join(', ') : 'None yet'}</p>
+          <p className="muted fav-summary">Pinned: {favorites.length ? favorites.join(', ') : 'None yet'}</p>
           <button className="text-btn" onClick={() => setShowFavoritePanel((v) => !v)}>
             {showFavoritePanel ? 'Hide number picker' : 'Set favorite numbers'}
           </button>
@@ -189,11 +265,13 @@ function App() {
 
         {showFavoritePanel && (
           <>
-            <p className="muted fav-help">Tap a number to pin/unpin your lucky set.</p>
+            <p className="muted fav-help">
+              Tap a number to pin or unpin your lucky set for {game.label}. You can save up to {game.mainCount} numbers.
+            </p>
             <div className="favorites-grid">
-              {Array.from({ length: 50 }, (_, i) => i + 1).map((n) => (
+              {Array.from({ length: game.maxNumber }, (_, i) => i + 1).map((n) => (
                 <button
-                  key={n}
+                  key={`${game.key}-${n}`}
                   className={`fav-pill ${favorites.includes(n) ? 'active' : ''}`}
                   onClick={() => toggleFavorite(n)}
                   title={favorites.includes(n) ? 'Remove favorite' : 'Add favorite'}
@@ -211,31 +289,43 @@ function App() {
           <section className="card glass card-pick">
             <div className="card-header">
               <h3>{pick.game} Quick Pick</h3>
-              <span className="chip">Try this line</span>
+              <span className="chip">{pick.rules?.mainCount || game.mainCount} main numbers</span>
             </div>
+
+            <p className="muted">
+              Your numbers: <strong>{pick.rules?.mainCount || game.mainCount}</strong> main picks from 1 to <strong>{pick.rules?.maxNumber || game.maxNumber}</strong>.
+            </p>
 
             <div className="numbers">
               {pick.numbers.map((n, i) => (
                 <div
-                  key={`${revealTick}-${n}-${i}`}
+                  key={`${revealTick}-${pick.gameKey || game.key}-${n}-${i}`}
                   className="ball reveal"
                   style={{ animationDelay: `${i * 90}ms` }}
                 >
                   {n}
                 </div>
               ))}
-              <div className="ball bonus reveal" style={{ animationDelay: `${pick.numbers.length * 90}ms` }}>B {pick.bonus}</div>
             </div>
 
+            <div className="numbers" style={{ marginTop: '0.9rem' }}>
+              <div className="ball bonus reveal" style={{ animationDelay: `${pick.numbers.length * 90}ms` }}>
+                B {pick.bonus}
+              </div>
+            </div>
+
+            <p className="muted">
+              <strong>{pick.rules?.bonusLabel || 'Bonus Number'}:</strong> {pick.bonus}. This is shown separately so it does not look like an extra number in your main line.
+            </p>
             <p className="muted">{pick.note}</p>
           </section>
         )}
 
-        {store && (
+        {store && game.supportsStore && (
           <section className="card glass card-store">
             <div className="card-header">
               <h3>Recent Winning Ticket Sold</h3>
-              <span className="chip gold">Quick reference</span>
+              <span className="chip gold">Lotto Max reference</span>
             </div>
 
             <div className="quick-store">

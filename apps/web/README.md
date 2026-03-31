@@ -24,3 +24,8 @@ Behavior:
 ## Deployment
 
 This app is now intended to work with Vercel-only deployment using root-level Vercel API routes.
+
+## UX notes
+
+- The UI now lets the user switch between Lotto Max and Lotto 6/49.
+- Main picked numbers are displayed separately from the bonus number to avoid making the bonus look like an extra user-selected number.

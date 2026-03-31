@@ -1,14 +1,37 @@
 const OLG_WHERE_SOLD_URL = 'https://about.olg.ca/winners-and-players/ticket-information/where-winning-tickets-were-sold/';
 
-function pickLottoMaxNumbers() {
+const GAME_CONFIG = {
+  lottomax: {
+    key: 'lottomax',
+    label: 'Lotto Max',
+    mainCount: 7,
+    maxNumber: 50,
+    bonusLabel: 'Bonus Number',
+    note: 'Random quick pick for fun. Not a prediction.'
+  },
+  lotto649: {
+    key: 'lotto649',
+    label: 'Lotto 6/49',
+    mainCount: 6,
+    maxNumber: 49,
+    bonusLabel: 'Bonus Number',
+    note: 'Random quick pick for fun. Not a prediction.'
+  }
+};
+
+function getGameConfig(gameKey = 'lottomax') {
+  return GAME_CONFIG[gameKey] || GAME_CONFIG.lottomax;
+}
+
+function pickNumbers(count, maxNumber) {
   const nums = new Set();
-  while (nums.size < 7) nums.add(Math.floor(Math.random() * 50) + 1);
+  while (nums.size < count) nums.add(Math.floor(Math.random() * maxNumber) + 1);
   return [...nums].sort((a, b) => a - b);
 }
 
-function pickBonus(exclude) {
+function pickBonus(exclude, maxNumber) {
   let n;
-  do n = Math.floor(Math.random() * 50) + 1;
+  do n = Math.floor(Math.random() * maxNumber) + 1;
   while (exclude.includes(n));
   return n;
 }
@@ -117,10 +140,22 @@ async function getCachedStoreData(force = false) {
   return cache.storeData;
 }
 
-function buildPickResponse() {
-  const numbers = pickLottoMaxNumbers();
-  const bonus = pickBonus(numbers);
-  return { game: 'Lotto Max', numbers, bonus, note: 'Random quick pick for fun. Not a prediction.' };
+function buildPickResponse(gameKey = 'lottomax') {
+  const game = getGameConfig(gameKey);
+  const numbers = pickNumbers(game.mainCount, game.maxNumber);
+  const bonus = pickBonus(numbers, game.maxNumber);
+  return {
+    game: game.label,
+    gameKey: game.key,
+    rules: {
+      mainCount: game.mainCount,
+      maxNumber: game.maxNumber,
+      bonusLabel: game.bonusLabel
+    },
+    numbers,
+    bonus,
+    note: game.note
+  };
 }
 
 async function buildRecentWinningStoreResponse(force = false) {
@@ -141,6 +176,8 @@ function sendJson(res, status, data) {
 }
 
 export {
+  GAME_CONFIG,
+  getGameConfig,
   buildPickResponse,
   buildRecentWinningStoreResponse,
   sendJson,

@@ -1,6 +1,11 @@
 # lotto-helper
 
-A small Lotto Max helper app with:
+A small Lotto helper app with support for:
+
+- **Lotto Max** — 7 main numbers from 1–50, plus a separate bonus number
+- **Lotto 6/49** — 6 main numbers from 1–49, plus a separate bonus number
+
+Project layout:
 
 - `apps/web` — Vite + React frontend
 - `apps/api` — Express API
