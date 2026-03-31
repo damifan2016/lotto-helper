@@ -26,8 +26,8 @@ const GAME_OPTIONS = {
     label: 'Lotto 6/49',
     mainCount: 6,
     maxNumber: 49,
-    hasBonus: true,
-    bonusLabel: 'Bonus Number',
+    hasBonus: false,
+    bonusLabel: null,
     pickPath: '/lotto649/pick',
     storePath: '/lotto649/recent-winning-store',
     supportsStore: true,
@@ -130,16 +130,11 @@ function App() {
       }
 
       const finalNumbers = merged.slice(0, game.mainCount).sort((a, b) => a - b);
-      const finalBonus = game.hasBonus
-        ? (!base.bonus || finalNumbers.includes(base.bonus)
-            ? randomUniqueFromRange(1, game.maxNumber, finalNumbers)[0]
-            : base.bonus)
-        : null;
 
       setPick({
         ...base,
         numbers: finalNumbers,
-        bonus: finalBonus,
+        bonus: null,
         note: `Favorites mix applied (${guaranteedFavorites.length} guaranteed favorite${guaranteedFavorites.length > 1 ? 's' : ''}). ${base.note || ''}`.trim(),
       });
 
@@ -236,8 +231,7 @@ function App() {
         </div>
 
         <p className="muted">
-          <strong>{game.label}</strong>: pick {game.mainCount} main number{game.mainCount > 1 ? 's' : ''} from 1 to {game.maxNumber}
-          {game.hasBonus ? '. Includes a bonus number.' : '. No bonus number for this quick pick.'}
+          <strong>{game.label}</strong>: pick {game.mainCount} main number{game.mainCount > 1 ? 's' : ''} from 1 to {game.maxNumber}.
         </p>
 
         <div className="actions">
@@ -311,11 +305,6 @@ function App() {
                   {n}
                 </div>
               ))}
-              {pick.rules?.hasBonus && pick.bonus != null && (
-                <div className="ball bonus reveal" style={{ animationDelay: `${pick.numbers.length * 90}ms` }}>
-                  B {pick.bonus}
-                </div>
-              )}
             </div>
 
             <p className="muted">{pick.note}</p>

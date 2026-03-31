@@ -11,28 +11,20 @@ function pickNumbers(count, maxNumber) {
   return [...nums].sort((a, b) => a - b);
 }
 
-function pickBonus(exclude, maxNumber) {
-  let n;
-  do n = Math.floor(Math.random() * maxNumber) + 1;
-  while (exclude.includes(n));
-  return n;
-}
-
 export default async function handler(_req, res) {
   try {
     const numbers = pickNumbers(6, 49);
-    const bonus = pickBonus(numbers, 49);
     sendJson(res, 200, {
       game: 'Lotto 6/49',
       gameKey: 'lotto649',
       rules: {
         mainCount: 6,
         maxNumber: 49,
-        hasBonus: true,
-        bonusLabel: 'Bonus Number'
+        hasBonus: false,
+        bonusLabel: null
       },
       numbers,
-      bonus,
+      bonus: null,
       note: 'Random quick pick for fun. Not a prediction.'
     });
   } catch (err) {

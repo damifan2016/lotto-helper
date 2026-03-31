@@ -16,8 +16,8 @@ const GAME_CONFIG = {
     label: 'Lotto 6/49',
     mainCount: 6,
     maxNumber: 49,
-    hasBonus: true,
-    bonusLabel: 'Bonus Number',
+    hasBonus: false,
+    bonusLabel: null,
     productPattern: /lotto\s*(6\/49|649)/i,
     note: 'Random quick pick for fun. Not a prediction.'
   }
@@ -31,13 +31,6 @@ function pickNumbers(count, maxNumber) {
   const nums = new Set();
   while (nums.size < count) nums.add(Math.floor(Math.random() * maxNumber) + 1);
   return [...nums].sort((a, b) => a - b);
-}
-
-function pickBonus(exclude, maxNumber) {
-  let n;
-  do n = Math.floor(Math.random() * maxNumber) + 1;
-  while (exclude.includes(n));
-  return n;
 }
 
 function parseDate(value) {
@@ -127,18 +120,17 @@ async function getCachedRows(force = false) {
 function buildPickResponse(gameKey = 'lottomax') {
   const game = getGameConfig(gameKey);
   const numbers = pickNumbers(game.mainCount, game.maxNumber);
-  const bonus = game.hasBonus ? pickBonus(numbers, game.maxNumber) : null;
   return {
     game: game.label,
     gameKey: game.key,
     rules: {
       mainCount: game.mainCount,
       maxNumber: game.maxNumber,
-      hasBonus: game.hasBonus,
-      bonusLabel: game.bonusLabel
+      hasBonus: false,
+      bonusLabel: null
     },
     numbers,
-    bonus,
+    bonus: null,
     note: game.note
   };
 }
