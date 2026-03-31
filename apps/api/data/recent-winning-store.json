@@ -1,0 +1,9 @@
+{
+  "game": "Lotto Max",
+  "drawDate": "2026-03-01",
+  "winningNumbers": [3, 8, 14, 21, 33, 41, 47],
+  "bonus": 5,
+  "storeName": "Example Convenience",
+  "location": "Toronto, ON",
+  "source": "Manual seed data (replace with verified latest source)"
+}

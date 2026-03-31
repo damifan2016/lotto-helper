@@ -1,0 +1,9 @@
+{
+  "name": "lotto-helper",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w @lotto/api",
+    "dev:web": "npm run dev -w @lotto/web"
+  }
+}
