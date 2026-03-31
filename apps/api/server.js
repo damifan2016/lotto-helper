@@ -5,7 +5,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.API_PORT || 3002;
+const PORT = process.env.PORT || process.env.API_PORT || 3002;
 const OLG_WHERE_SOLD_URL = 'https://about.olg.ca/winners-and-players/ticket-information/where-winning-tickets-were-sold/';
 
 function pickLottoMaxNumbers() {
