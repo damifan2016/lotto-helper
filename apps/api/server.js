@@ -30,7 +30,13 @@ app.get('/api/lotto649/pick', (_req, res) => {
 
 app.get('/api/lottomax/recent-winning-store', async (req, res) => {
   const force = req.query.force === '1';
-  const data = await buildRecentWinningStoreResponse(force);
+  const data = await buildRecentWinningStoreResponse('lottomax', force);
+  sendJson(res, 200, data);
+});
+
+app.get('/api/lotto649/recent-winning-store', async (req, res) => {
+  const force = req.query.force === '1';
+  const data = await buildRecentWinningStoreResponse('lotto649', force);
   sendJson(res, 200, data);
 });
 

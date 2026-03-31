@@ -16,6 +16,7 @@ const GAME_OPTIONS = {
     hasBonus: false,
     bonusLabel: null,
     pickPath: '/lottomax/pick',
+    storePath: '/lottomax/recent-winning-store',
     supportsStore: true,
     heroTitle: 'Lotto Lucky Helper',
     quickPickLabel: '🎲 Lotto Max Quick Pick'
@@ -28,7 +29,8 @@ const GAME_OPTIONS = {
     hasBonus: true,
     bonusLabel: 'Bonus Number',
     pickPath: '/lotto649/pick',
-    supportsStore: false,
+    storePath: '/lotto649/recent-winning-store',
+    supportsStore: true,
     heroTitle: 'Lotto Lucky Helper',
     quickPickLabel: '🎲 Lotto 6/49 Quick Pick'
   }
@@ -158,11 +160,11 @@ function App() {
     setError('');
     setLoadingStore(true);
     try {
-      const r = await fetch(`${API}/lottomax/recent-winning-store${force ? '?force=1' : ''}`);
+      const r = await fetch(`${API}${game.storePath}${force ? '?force=1' : ''}`);
       if (!r.ok) throw new Error('store-request-failed');
       setStore(await r.json());
     } catch {
-      setError('Could not fetch recent winning store.');
+      setError(`Could not fetch recent ${game.label} winning store.`);
     } finally {
       setLoadingStore(false);
     }
@@ -170,6 +172,7 @@ function App() {
 
   useEffect(() => {
     setPick(null);
+    setStore(null);
     setError('');
     setShowStoreDetails(false);
     if (game.supportsStore) {
@@ -177,7 +180,6 @@ function App() {
       const timer = setInterval(() => loadStore(false), 5 * 60 * 1000);
       return () => clearInterval(timer);
     }
-    setStore(null);
     return undefined;
   }, [gameKey]);
 
@@ -333,7 +335,7 @@ function App() {
           <section className="card glass card-store">
             <div className="card-header">
               <h3>Recent Winning Ticket Sold</h3>
-              <span className="chip gold">Lotto Max reference</span>
+              <span className="chip gold">{game.label} reference</span>
             </div>
 
             <div className="quick-store">

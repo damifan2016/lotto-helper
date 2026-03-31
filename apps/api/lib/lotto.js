@@ -8,6 +8,7 @@ const GAME_CONFIG = {
     maxNumber: 50,
     hasBonus: false,
     bonusLabel: null,
+    productPattern: /lotto\s*max/i,
     note: 'Random quick pick for fun. Not a prediction.'
   },
   lotto649: {
@@ -17,6 +18,7 @@ const GAME_CONFIG = {
     maxNumber: 49,
     hasBonus: true,
     bonusLabel: 'Bonus Number',
+    productPattern: /lotto\s*(6\/49|649)/i,
     note: 'Random quick pick for fun. Not a prediction.'
   }
 };
@@ -73,17 +75,18 @@ function parseWhereSoldRows(html) {
   return rows;
 }
 
-function pickLatestLottoMax(rows) {
-  const lottoMaxRows = rows
-    .filter(r => /lotto\s*max/i.test(r.product))
+function pickLatestGameRow(rows, gameKey) {
+  const game = getGameConfig(gameKey);
+  const matches = rows
+    .filter((r) => game.productPattern.test(r.product))
     .sort((a, b) => b.drawDate - a.drawDate);
-  return lottoMaxRows[0] || null;
+  return matches[0] || null;
 }
 
 const cache = {
   updatedAt: 0,
   ttlMs: 30 * 60 * 1000,
-  storeData: null,
+  rows: null,
   error: null
 };
 
@@ -100,46 +103,25 @@ async function refreshWhereSoldCache() {
 
     const html = await res.text();
     const rows = parseWhereSoldRows(html);
-    const latest = pickLatestLottoMax(rows);
-    if (!latest) throw new Error('No Lotto Max row found in OLG where-sold page');
+    if (!rows.length) throw new Error('No valid rows found in OLG where-sold page');
 
-    cache.storeData = {
-      game: 'Lotto Max',
-      drawDate: latest.drawRaw,
-      storeName: latest.name,
-      location: latest.address,
-      prizeValue: latest.value,
-      source: OLG_WHERE_SOLD_URL,
-      sourceLabel: 'Official OLG – Where Winning Tickets Were Sold',
-      note: 'Derived from OLG table row with Product containing "Lotto Max" and latest draw date.'
-    };
+    cache.rows = rows;
     cache.error = null;
     cache.updatedAt = Date.now();
-    return cache.storeData;
+    return cache.rows;
   } catch (err) {
     cache.error = err.message || 'Unknown refresh error';
-    if (!cache.storeData) {
-      cache.storeData = {
-        game: 'Lotto Max',
-        drawDate: null,
-        storeName: null,
-        location: null,
-        prizeValue: null,
-        source: OLG_WHERE_SOLD_URL,
-        sourceLabel: 'Official OLG – Where Winning Tickets Were Sold',
-        note: 'Live data temporarily unavailable.'
-      };
-    }
-    return cache.storeData;
+    if (!cache.rows) cache.rows = [];
+    return cache.rows;
   }
 }
 
-async function getCachedStoreData(force = false) {
+async function getCachedRows(force = false) {
   const expired = (Date.now() - cache.updatedAt) > cache.ttlMs;
   if (force || !cache.updatedAt || expired) {
     return refreshWhereSoldCache();
   }
-  return cache.storeData;
+  return cache.rows;
 }
 
 function buildPickResponse(gameKey = 'lottomax') {
@@ -161,13 +143,40 @@ function buildPickResponse(gameKey = 'lottomax') {
   };
 }
 
-async function buildRecentWinningStoreResponse(force = false) {
-  const data = await getCachedStoreData(force);
+async function buildRecentWinningStoreResponse(gameKey = 'lottomax', force = false) {
+  const game = getGameConfig(gameKey);
+  const rows = await getCachedRows(force);
+  const latest = pickLatestGameRow(rows, gameKey);
+
+  const data = latest
+    ? {
+        game: game.label,
+        gameKey: game.key,
+        drawDate: latest.drawRaw,
+        storeName: latest.name,
+        location: latest.address,
+        prizeValue: latest.value,
+        source: OLG_WHERE_SOLD_URL,
+        sourceLabel: 'Official OLG – Where Winning Tickets Were Sold',
+        note: `Derived from OLG table row with Product matching ${game.label}.`
+      }
+    : {
+        game: game.label,
+        gameKey: game.key,
+        drawDate: null,
+        storeName: null,
+        location: null,
+        prizeValue: null,
+        source: OLG_WHERE_SOLD_URL,
+        sourceLabel: 'Official OLG – Where Winning Tickets Were Sold',
+        note: 'Live data temporarily unavailable.'
+      };
+
   return {
     ...data,
     cacheUpdatedAt: cache.updatedAt ? new Date(cache.updatedAt).toISOString() : null,
     cacheTtlMinutes: Math.round(cache.ttlMs / 60000),
-    fetchError: cache.error
+    fetchError: cache.error || (!latest ? `No ${game.label} row found in OLG where-sold page` : null)
   };
 }
 
@@ -185,5 +194,5 @@ export {
   buildRecentWinningStoreResponse,
   sendJson,
   refreshWhereSoldCache,
-  getCachedStoreData
+  getCachedRows
 };

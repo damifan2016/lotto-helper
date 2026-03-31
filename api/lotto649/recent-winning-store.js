@@ -1,7 +1,7 @@
 const OLG_WHERE_SOLD_URL = 'https://about.olg.ca/winners-and-players/ticket-information/where-winning-tickets-were-sold/';
-const PRODUCT_PATTERN = /lotto\s*max/i;
-const GAME_LABEL = 'Lotto Max';
-const GAME_KEY = 'lottomax';
+const PRODUCT_PATTERN = /lotto\s*(6\/49|649)/i;
+const GAME_LABEL = 'Lotto 6/49';
+const GAME_KEY = 'lotto649';
 
 const cache = {
   updatedAt: 0,
