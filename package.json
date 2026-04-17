@@ -1,6 +1,7 @@
 {
   "name": "lotto-helper",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*"
   ],
