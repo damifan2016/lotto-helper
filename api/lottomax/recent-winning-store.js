@@ -1,136 +1,16 @@
-const OLG_WHERE_SOLD_URL = 'https://about.olg.ca/winners-and-players/ticket-information/where-winning-tickets-were-sold/';
-const PRODUCT_PATTERN = /lotto\s*max/i;
-const GAME_LABEL = 'Lotto Max';
-const GAME_KEY = 'lottomax';
-
-const cache = {
-  updatedAt: 0,
-  ttlMs: 30 * 60 * 1000,
-  rows: null,
-  error: null
-};
-
-function sendJson(res, status, data) {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.end(JSON.stringify(data));
-}
-
-function parseDate(value) {
-  const m = String(value || '').trim().match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
-  if (!m) return null;
-  const months = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
-  const mm = months[m[2]];
-  if (mm == null) return null;
-  return new Date(Date.UTC(Number(m[3]), mm, Number(m[1])));
-}
-
-function stripTags(s) {
-  return String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function parseWhereSoldRows(html) {
-  const rows = [];
-  const trMatches = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
-  for (const tr of trMatches) {
-    const tds = tr.match(/<td[\s\S]*?<\/td>/gi) || [];
-    if (tds.length < 5) continue;
-
-    const name = stripTags(tds[0]);
-    const address = stripTags(tds[1]);
-    const product = stripTags(tds[2]);
-    const drawRaw = stripTags(tds[3]);
-    const value = stripTags(tds[4]);
-
-    if (!name || !address || !product) continue;
-    const drawDate = parseDate(drawRaw);
-    if (!drawDate) continue;
-
-    rows.push({ name, address, product, drawRaw, drawDate, value });
-  }
-  return rows;
-}
-
-function pickLatestGameRow(rows) {
-  const matches = rows
-    .filter((r) => PRODUCT_PATTERN.test(r.product))
-    .sort((a, b) => b.drawDate - a.drawDate);
-  return matches[0] || null;
-}
-
-async function refreshWhereSoldCache() {
-  try {
-    if (typeof fetch !== 'function') {
-      throw new Error('Global fetch is unavailable in this runtime');
-    }
-
-    const response = await fetch(OLG_WHERE_SOLD_URL, {
-      headers: { 'user-agent': 'Mozilla/5.0 (LottoHelper/1.0)' }
-    });
-
-    if (!response.ok) {
-      throw new Error(`OLG fetch failed: ${response.status}`);
-    }
-
-    const html = await response.text();
-    const rows = parseWhereSoldRows(html);
-    if (!rows.length) throw new Error('No valid rows found in OLG where-sold page');
-
-    cache.rows = rows;
-    cache.error = null;
-    cache.updatedAt = Date.now();
-    return cache.rows;
-  } catch (err) {
-    cache.error = err?.message || String(err);
-    if (!cache.rows) cache.rows = [];
-    return cache.rows;
-  }
-}
-
-async function getCachedRows(force = false) {
-  const expired = (Date.now() - cache.updatedAt) > cache.ttlMs;
-  if (force || !cache.updatedAt || expired) {
-    return refreshWhereSoldCache();
-  }
-  return cache.rows;
-}
+import {
+  buildRecentWinningStoreResponse,
+  sendJson
+} from '../../apps/api/lib/lotto.js';
 
 export default async function handler(req, res) {
   try {
     const force = req.query?.force === '1';
-    const rows = await getCachedRows(force);
-    const latest = pickLatestGameRow(rows);
-    const data = latest
-      ? {
-          game: GAME_LABEL,
-          gameKey: GAME_KEY,
-          drawDate: latest.drawRaw,
-          storeName: latest.name,
-          location: latest.address,
-          prizeValue: latest.value,
-          source: OLG_WHERE_SOLD_URL,
-          sourceLabel: 'Official OLG – Where Winning Tickets Were Sold',
-          note: `Derived from OLG table row with Product matching ${GAME_LABEL}.`
-        }
-      : {
-          game: GAME_LABEL,
-          gameKey: GAME_KEY,
-          drawDate: null,
-          storeName: null,
-          location: null,
-          prizeValue: null,
-          source: OLG_WHERE_SOLD_URL,
-          sourceLabel: 'Official OLG – Where Winning Tickets Were Sold',
-          note: 'Live data temporarily unavailable.'
-        };
-
-    sendJson(res, 200, {
-      ...data,
-      cacheUpdatedAt: cache.updatedAt ? new Date(cache.updatedAt).toISOString() : null,
-      cacheTtlMinutes: Math.round(cache.ttlMs / 60000),
-      fetchError: cache.error || (!latest ? `No ${GAME_LABEL} row found in OLG where-sold page` : null)
-    });
+    sendJson(
+      res,
+      200,
+      await buildRecentWinningStoreResponse('lottomax', force)
+    );
   } catch (err) {
     sendJson(res, 500, { ok: false, error: err?.message || String(err) });
   }

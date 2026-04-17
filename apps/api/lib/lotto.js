@@ -1,4 +1,6 @@
-const OLG_WHERE_SOLD_URL = 'https://about.olg.ca/winners-and-players/ticket-information/where-winning-tickets-were-sold/';
+const OLG_WHERE_SOLD_URL =
+  'https://about.olg.ca/winners-and-players/ticket-information/where-winning-tickets-were-sold/';
+const FETCH_TIMEOUT_MS = 10_000;
 
 const GAME_CONFIG = {
   lottomax: {
@@ -28,22 +30,61 @@ function getGameConfig(gameKey = 'lottomax') {
 }
 
 function pickNumbers(count, maxNumber) {
+  if (
+    !Number.isInteger(count) ||
+    !Number.isInteger(maxNumber) ||
+    count < 1 ||
+    maxNumber < 1 ||
+    count > maxNumber
+  ) {
+    throw new Error(
+      `Invalid quick-pick request: count=${count}, maxNumber=${maxNumber}`
+    );
+  }
+
   const nums = new Set();
   while (nums.size < count) nums.add(Math.floor(Math.random() * maxNumber) + 1);
   return [...nums].sort((a, b) => a - b);
 }
 
 function parseDate(value) {
-  const m = String(value || '').trim().match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  const m = String(value || '')
+    .trim()
+    .match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
   if (!m) return null;
-  const months = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+  const months = {
+    Jan: 0,
+    Feb: 1,
+    Mar: 2,
+    Apr: 3,
+    May: 4,
+    Jun: 5,
+    Jul: 6,
+    Aug: 7,
+    Sep: 8,
+    Oct: 9,
+    Nov: 10,
+    Dec: 11
+  };
   const mm = months[m[2]];
   if (mm == null) return null;
   return new Date(Date.UTC(Number(m[3]), mm, Number(m[1])));
 }
 
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
 function stripTags(s) {
-  return String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  return decodeHtmlEntities(String(s || '').replace(/<[^>]*>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function parseWhereSoldRows(html) {
@@ -89,14 +130,30 @@ async function refreshWhereSoldCache() {
       throw new Error('Global fetch is unavailable in this runtime');
     }
 
+    const controller =
+      typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = controller
+      ? setTimeout(
+          () =>
+            controller.abort(
+              new Error(`OLG fetch timed out after ${FETCH_TIMEOUT_MS}ms`)
+            ),
+          FETCH_TIMEOUT_MS
+        )
+      : null;
+
     const res = await fetch(OLG_WHERE_SOLD_URL, {
-      headers: { 'user-agent': 'Mozilla/5.0 (LottoHelper/1.0)' }
+      headers: { 'user-agent': 'Mozilla/5.0 (LottoHelper/1.0)' },
+      signal: controller?.signal
+    }).finally(() => {
+      if (timeout) clearTimeout(timeout);
     });
     if (!res.ok) throw new Error(`OLG fetch failed: ${res.status}`);
 
     const html = await res.text();
     const rows = parseWhereSoldRows(html);
-    if (!rows.length) throw new Error('No valid rows found in OLG where-sold page');
+    if (!rows.length)
+      throw new Error('No valid rows found in OLG where-sold page');
 
     cache.rows = rows;
     cache.error = null;
@@ -110,7 +167,7 @@ async function refreshWhereSoldCache() {
 }
 
 async function getCachedRows(force = false) {
-  const expired = (Date.now() - cache.updatedAt) > cache.ttlMs;
+  const expired = Date.now() - cache.updatedAt > cache.ttlMs;
   if (force || !cache.updatedAt || expired) {
     return refreshWhereSoldCache();
   }
@@ -135,7 +192,10 @@ function buildPickResponse(gameKey = 'lottomax') {
   };
 }
 
-async function buildRecentWinningStoreResponse(gameKey = 'lottomax', force = false) {
+async function buildRecentWinningStoreResponse(
+  gameKey = 'lottomax',
+  force = false
+) {
   const game = getGameConfig(gameKey);
   const rows = await getCachedRows(force);
   const latest = pickLatestGameRow(rows, gameKey);
@@ -166,9 +226,13 @@ async function buildRecentWinningStoreResponse(gameKey = 'lottomax', force = fal
 
   return {
     ...data,
-    cacheUpdatedAt: cache.updatedAt ? new Date(cache.updatedAt).toISOString() : null,
+    cacheUpdatedAt: cache.updatedAt
+      ? new Date(cache.updatedAt).toISOString()
+      : null,
     cacheTtlMinutes: Math.round(cache.ttlMs / 60000),
-    fetchError: cache.error || (!latest ? `No ${game.label} row found in OLG where-sold page` : null)
+    fetchError:
+      cache.error ||
+      (!latest ? `No ${game.label} row found in OLG where-sold page` : null)
   };
 }
 
@@ -180,8 +244,12 @@ function sendJson(res, status, data) {
 }
 
 export {
+  FETCH_TIMEOUT_MS,
   GAME_CONFIG,
   getGameConfig,
+  parseWhereSoldRows,
+  pickNumbers,
+  decodeHtmlEntities,
   buildPickResponse,
   buildRecentWinningStoreResponse,
   sendJson,

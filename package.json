@@ -1,9 +1,23 @@
 {
   "name": "lotto-helper",
   "private": true,
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev:api": "npm run dev -w @lotto/api",
-    "dev:web": "npm run dev -w @lotto/web"
+    "dev:web": "npm run dev -w @lotto/web",
+    "test": "npm run test -w @lotto/api && npm run test -w @lotto/web",
+    "build": "npm run build -w @lotto/web",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.0",
+    "globals": "^17.5.0",
+    "prettier": "^3.8.3"
   }
 }

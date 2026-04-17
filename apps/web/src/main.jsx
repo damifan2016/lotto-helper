@@ -1,5 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+
+import './styles.css';
+import {
+  buildCopyText,
+  buildFavoriteMix,
+  buildStoreSummary,
+  getRefreshLabel
+} from './app-utils.js';
 
 const API =
   import.meta.env.VITE_API_BASE_URL ||
@@ -13,8 +21,6 @@ const GAME_OPTIONS = {
     label: 'Lotto Max',
     mainCount: 7,
     maxNumber: 50,
-    hasBonus: false,
-    bonusLabel: null,
     pickPath: '/lottomax/pick',
     storePath: '/lottomax/recent-winning-store',
     supportsStore: true,
@@ -26,8 +32,6 @@ const GAME_OPTIONS = {
     label: 'Lotto 6/49',
     mainCount: 6,
     maxNumber: 49,
-    hasBonus: false,
-    bonusLabel: null,
     pickPath: '/lotto649/pick',
     storePath: '/lotto649/recent-winning-store',
     supportsStore: true,
@@ -52,6 +56,7 @@ function App() {
   const [favorites, setFavorites] = useState([]);
   const [showFavoritePanel, setShowFavoritePanel] = useState(false);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     try {
@@ -73,30 +78,27 @@ function App() {
     localStorage.setItem(favKey, JSON.stringify(favorites));
   }, [favKey, favorites]);
 
-  const randomUniqueFromRange = (count, maxNumber, excluded = []) => {
-    const out = [];
-    const blocked = new Set(excluded);
-    while (out.length < count) {
-      const n = Math.floor(Math.random() * maxNumber) + 1;
-      if (blocked.has(n) || out.includes(n)) continue;
-      out.push(n);
-    }
-    return out;
-  };
+  useEffect(() => {
+    if (!copied) return undefined;
+
+    const timer = setTimeout(() => setCopied(false), 2200);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   const fetchPick = async () => {
-    const r = await fetch(`${API}${game.pickPath}`);
-    if (!r.ok) throw new Error('pick-request-failed');
-    return r.json();
+    const response = await fetch(`${API}${game.pickPath}`);
+    if (!response.ok) throw new Error('pick-request-failed');
+    return response.json();
   };
 
   const generatePick = async () => {
     setError('');
+    setCopied(false);
     setLoadingPick(true);
     try {
       const data = await fetchPick();
       setPick(data);
-      setRevealTick((t) => t + 1);
+      setRevealTick((tick) => tick + 1);
     } catch {
       setError(`Could not generate ${game.label} numbers.`);
     } finally {
@@ -111,34 +113,25 @@ function App() {
     }
 
     setError('');
+    setCopied(false);
     setLoadingPick(true);
 
     try {
       const base = await fetchPick();
-
-      const favPool = [...favorites].sort(() => Math.random() - 0.5);
-      const guaranteedFavorites = favPool.slice(0, Math.min(game.mainCount, favPool.length));
-      const merged = [...guaranteedFavorites];
-
-      for (const n of (base.numbers || [])) {
-        if (merged.length >= game.mainCount) break;
-        if (!merged.includes(n)) merged.push(n);
-      }
-
-      if (merged.length < game.mainCount) {
-        merged.push(...randomUniqueFromRange(game.mainCount - merged.length, game.maxNumber, merged));
-      }
-
-      const finalNumbers = merged.slice(0, game.mainCount).sort((a, b) => a - b);
+      const finalNumbers = buildFavoriteMix({
+        baseNumbers: base.numbers || [],
+        favorites,
+        mainCount: game.mainCount,
+        maxNumber: game.maxNumber
+      });
 
       setPick({
         ...base,
         numbers: finalNumbers,
         bonus: null,
-        note: `Favorites mix applied (${guaranteedFavorites.length} guaranteed favorite${guaranteedFavorites.length > 1 ? 's' : ''}). ${base.note || ''}`.trim(),
+        note: `Favorites mix applied (${Math.min(favorites.length, game.mainCount)} guaranteed favorite${favorites.length === 1 ? '' : 's'}). ${base.note || ''}`.trim()
       });
-
-      setRevealTick((t) => t + 1);
+      setRevealTick((tick) => tick + 1);
     } catch {
       setError(`Could not generate a ${game.label} favorites mix.`);
     } finally {
@@ -155,9 +148,11 @@ function App() {
     setError('');
     setLoadingStore(true);
     try {
-      const r = await fetch(`${API}${game.storePath}${force ? '?force=1' : ''}`);
-      if (!r.ok) throw new Error('store-request-failed');
-      setStore(await r.json());
+      const response = await fetch(
+        `${API}${game.storePath}${force ? '?force=1' : ''}`
+      );
+      if (!response.ok) throw new Error('store-request-failed');
+      setStore(await response.json());
     } catch {
       setError(`Could not fetch recent ${game.label} winning store.`);
     } finally {
@@ -169,29 +164,52 @@ function App() {
     setPick(null);
     setStore(null);
     setError('');
+    setCopied(false);
     setShowStoreDetails(false);
+
     if (game.supportsStore) {
       loadStore(false);
       const timer = setInterval(() => loadStore(false), 5 * 60 * 1000);
       return () => clearInterval(timer);
     }
+
     return undefined;
   }, [gameKey]);
 
   const toggleFavorite = (n) => {
-    setFavorites((curr) => {
-      if (curr.includes(n)) return curr.filter((x) => x !== n);
-      if (curr.length >= game.mainCount) return curr;
-      return [...curr, n].sort((a, b) => a - b);
+    setFavorites((current) => {
+      if (current.includes(n)) return current.filter((value) => value !== n);
+      if (current.length >= game.mainCount) return current;
+      return [...current, n].sort((a, b) => a - b);
     });
   };
 
-  const quickStoreLine = useMemo(() => {
-    if (!store) return '';
-    const s = store.storeName || 'Winning retailer unavailable';
-    const l = store.location || 'Location unavailable';
-    return `${s} • ${l}`;
-  }, [store]);
+  const clearFavorites = () => {
+    setFavorites([]);
+    setError('');
+  };
+
+  const copyPick = async () => {
+    const text = buildCopyText(pick);
+    if (!text) return;
+
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error('clipboard-unavailable');
+      }
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setError('');
+    } catch {
+      setError('Could not copy this quick pick from your browser.');
+      setCopied(false);
+    }
+  };
+
+  const storeSummary = useMemo(() => buildStoreSummary(store), [store]);
+  const refreshLabel = useMemo(() => getRefreshLabel(store), [store]);
+  const pinnedSummary = favorites.length ? favorites.join(', ') : 'None yet';
+  const canClearFavorites = favorites.length > 0;
 
   return (
     <main className="app-shell">
@@ -201,17 +219,34 @@ function App() {
 
       <section className="jackpot-ticker glass" aria-label="jackpot ticker">
         <div className="ticker-track">
-          <span>💰 Dream big • Pick smart • Stay lucky • Lotto night • Fortune favors the brave • </span>
-          <span>💰 Dream big • Pick smart • Stay lucky • Lotto night • Fortune favors the brave • </span>
+          <span>
+            💰 Dream big • Pick smart • Stay lucky • Lotto night • Fortune
+            favors the brave •{' '}
+          </span>
+          <span>
+            💰 Dream big • Pick smart • Stay lucky • Lotto night • Fortune
+            favors the brave •{' '}
+          </span>
         </div>
       </section>
 
       <section className="hero glass">
         <p className="kicker">🍀 tonight could be your night</p>
         <h1>{game.heroTitle}</h1>
-        <p className="muted">
-          Switch between Lotto Max and Lotto 6/49, generate a quick line, and follow each game's actual pick format.
+        <p className="muted hero-copy">
+          Switch between Lotto Max and Lotto 6/49, generate a quick line, and
+          keep a reusable set of favorite numbers for each game.
         </p>
+
+        <div className="status-row" aria-label="current status">
+          <div className="status-pill">Game: {game.label}</div>
+          <div className="status-pill">
+            Pinned favorites: {favorites.length}/{game.mainCount}
+          </div>
+          <div className="status-pill status-pill-wide">
+            {loadingStore ? 'Refreshing winning store…' : refreshLabel}
+          </div>
+        </div>
 
         <div className="actions">
           <button
@@ -230,20 +265,33 @@ function App() {
           </button>
         </div>
 
-        <p className="muted">
-          <strong>{game.label}</strong>: pick {game.mainCount} main number{game.mainCount > 1 ? 's' : ''} from 1 to {game.maxNumber}.
+        <p className="muted rules-copy">
+          <strong>{game.label}</strong>: pick {game.mainCount} main number
+          {game.mainCount > 1 ? 's' : ''} from 1 to {game.maxNumber}.
         </p>
 
         <div className="actions">
-          <button className="btn btn-primary" onClick={generatePick} disabled={loadingPick}>
-            {loadingPick ? 'Generating...' : game.quickPickLabel}
+          <button
+            className="btn btn-primary"
+            onClick={generatePick}
+            disabled={loadingPick}
+          >
+            {loadingPick ? 'Generating…' : game.quickPickLabel}
           </button>
-          <button className="btn btn-favorite" onClick={generateFavoriteMix} disabled={loadingPick || !favorites.length}>
-            {loadingPick ? 'Generating...' : '⭐ Use My Favorites Mix'}
+          <button
+            className="btn btn-favorite"
+            onClick={generateFavoriteMix}
+            disabled={loadingPick || !favorites.length}
+          >
+            {loadingPick ? 'Generating…' : '⭐ Use My Favorites Mix'}
           </button>
           {game.supportsStore && (
-            <button className="btn btn-secondary" onClick={() => loadStore(true)} disabled={loadingStore}>
-              {loadingStore ? 'Loading...' : '📍 Refresh Winner Spot'}
+            <button
+              className="btn btn-secondary"
+              onClick={() => loadStore(true)}
+              disabled={loadingStore}
+            >
+              {loadingStore ? 'Loading…' : '📍 Refresh Winner Spot'}
             </button>
           )}
         </div>
@@ -252,32 +300,53 @@ function App() {
       <section className="card glass fav-card">
         <div className="card-header">
           <h3>⭐ Favorite Numbers</h3>
-          <span className="chip gold">{favorites.length}/{game.mainCount} pinned</span>
+          <span className="chip gold">
+            {favorites.length}/{game.mainCount} pinned
+          </span>
         </div>
 
         <div className="fav-summary-row">
-          <p className="muted fav-summary">Pinned: {favorites.length ? favorites.join(', ') : 'None yet'}</p>
-          <button className="text-btn" onClick={() => setShowFavoritePanel((v) => !v)}>
-            {showFavoritePanel ? 'Hide number picker' : 'Set favorite numbers'}
-          </button>
+          <p className="muted fav-summary">Pinned: {pinnedSummary}</p>
+          <div className="actions-inline actions-inline-wrap">
+            <button
+              className="text-btn"
+              onClick={() => setShowFavoritePanel((value) => !value)}
+            >
+              {showFavoritePanel
+                ? 'Hide number picker'
+                : 'Set favorite numbers'}
+            </button>
+            <button
+              className="text-btn"
+              onClick={clearFavorites}
+              disabled={!canClearFavorites}
+            >
+              Clear favorites
+            </button>
+          </div>
         </div>
 
         {showFavoritePanel && (
           <>
             <p className="muted fav-help">
-              Tap a number to pin or unpin your lucky set for {game.label}. You can save up to {game.mainCount} numbers.
+              Tap a number to pin or unpin your lucky set for {game.label}. You
+              can save up to {game.mainCount} numbers.
             </p>
             <div className="favorites-grid">
-              {Array.from({ length: game.maxNumber }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={`${game.key}-${n}`}
-                  className={`fav-pill ${favorites.includes(n) ? 'active' : ''}`}
-                  onClick={() => toggleFavorite(n)}
-                  title={favorites.includes(n) ? 'Remove favorite' : 'Add favorite'}
-                >
-                  {n}
-                </button>
-              ))}
+              {Array.from({ length: game.maxNumber }, (_, i) => i + 1).map(
+                (n) => (
+                  <button
+                    key={`${game.key}-${n}`}
+                    className={`fav-pill ${favorites.includes(n) ? 'active' : ''}`}
+                    onClick={() => toggleFavorite(n)}
+                    title={
+                      favorites.includes(n) ? 'Remove favorite' : 'Add favorite'
+                    }
+                  >
+                    {n}
+                  </button>
+                )
+              )}
             </div>
           </>
         )}
@@ -288,11 +357,16 @@ function App() {
           <section className="card glass card-pick">
             <div className="card-header">
               <h3>{pick.game} Quick Pick</h3>
-              <span className="chip">{pick.rules?.mainCount || game.mainCount} main numbers</span>
+              <span className="chip">
+                {pick.rules?.mainCount || game.mainCount} main numbers
+              </span>
             </div>
 
             <p className="muted">
-              Your numbers: <strong>{pick.rules?.mainCount || game.mainCount}</strong> main picks from 1 to <strong>{pick.rules?.maxNumber || game.maxNumber}</strong>.
+              Your numbers:{' '}
+              <strong>{pick.rules?.mainCount || game.mainCount}</strong> main
+              picks from 1 to{' '}
+              <strong>{pick.rules?.maxNumber || game.maxNumber}</strong>.
             </p>
 
             <div className="numbers">
@@ -307,6 +381,12 @@ function App() {
               ))}
             </div>
 
+            <div className="actions-inline actions-inline-wrap">
+              <button className="text-btn" onClick={copyPick}>
+                {copied ? 'Copied!' : 'Copy quick pick'}
+              </button>
+            </div>
+
             <p className="muted">{pick.note}</p>
           </section>
         )}
@@ -319,40 +399,53 @@ function App() {
             </div>
 
             <div className="quick-store">
-              <p className="quick-title">🏪 {quickStoreLine}</p>
-              <p className="quick-sub">Draw: <strong>{store.drawDate || 'N/A'}</strong> · Prize: <strong>{store.prizeValue || 'N/A'}</strong></p>
+              <p className="quick-title">🏪 {storeSummary.title}</p>
+              <p className="quick-sub">{storeSummary.meta}</p>
             </div>
 
-            <div className="actions-inline">
-              <button className="text-btn" onClick={() => setShowStoreDetails((v) => !v)}>
+            <div className="actions-inline actions-inline-wrap">
+              <button
+                className="text-btn"
+                onClick={() => setShowStoreDetails((value) => !value)}
+              >
                 {showStoreDetails ? 'Hide details' : 'Show more details'}
               </button>
             </div>
 
             {showStoreDetails && (
               <div className="details">
-                <p><span>Game</span><strong>{store.game}</strong></p>
-                <p><span>Store</span><strong>{store.storeName || 'N/A'}</strong></p>
-                <p><span>Location</span><strong>{store.location || 'N/A'}</strong></p>
-                <p className="muted">
+                <p>
+                  <span>Game</span>
+                  <strong>{store.game}</strong>
+                </p>
+                <p>
+                  <span>Store</span>
+                  <strong>{store.storeName || 'N/A'}</strong>
+                </p>
+                <p>
+                  <span>Location</span>
+                  <strong>{store.location || 'N/A'}</strong>
+                </p>
+                <p>
+                  <span>Refresh status</span>
+                  <strong>{refreshLabel}</strong>
+                </p>
+                <p className="details-stack muted">
                   Source:{' '}
                   <a href={store.source} target="_blank" rel="noreferrer">
                     {store.sourceLabel || store.source}
                   </a>
                 </p>
-                <p className="muted">
-                  Last server refresh:{' '}
-                  {store.cacheUpdatedAt ? new Date(store.cacheUpdatedAt).toLocaleString() : 'N/A'}
-                  {' '}• TTL: {store.cacheTtlMinutes || '?'} min
-                </p>
-                {store.fetchError ? <p className="warn">Live fetch note: {store.fetchError}</p> : null}
+                {store.fetchError ? (
+                  <p className="warn">Live fetch note: {store.fetchError}</p>
+                ) : null}
               </div>
             )}
           </section>
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error ? <p className="error">{error}</p> : null}
     </main>
   );
 }
