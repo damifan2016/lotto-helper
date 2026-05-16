@@ -1,0 +1,26 @@
+{
+  "name": "@lotto/mobile",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "prebuild:android": "bash ./scripts/android-env.sh npx expo prebuild --platform android",
+    "build:android": "bash ./scripts/android-env.sh ./android/gradlew -p android assembleRelease",
+    "install:android": "bash ./scripts/android-env.sh ./android/gradlew -p android installRelease",
+    "build:android:debug": "bash ./scripts/android-env.sh ./android/gradlew -p android assembleDebug",
+    "install:android:debug": "bash ./scripts/android-env.sh ./android/gradlew -p android installDebug",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "test": "node --test ../../packages/shared/test/mobile-config.test.js"
+  },
+  "dependencies": {
+    "@lotto/shared": "1.0.0",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "expo": "~54.0.33",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
+  },
+  "private": true
+}

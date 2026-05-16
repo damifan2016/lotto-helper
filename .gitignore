@@ -3,6 +3,8 @@ apps/*/node_modules/
 dist/
 build/
 .vercel/
+.hermes/
+.idea/
 .env
 .env.*
 !.env.example

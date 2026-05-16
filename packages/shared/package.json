@@ -1,0 +1,9 @@
+{
+  "name": "@lotto/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./mobile-config": "./src/mobile-config.js"
+  }
+}

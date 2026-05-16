@@ -3,12 +3,17 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev:api": "npm run dev -w @lotto/api",
     "dev:web": "npm run dev -w @lotto/web",
-    "test": "npm run test -w @lotto/api && npm run test -w @lotto/web",
+    "dev:mobile": "npm run start -w @lotto/mobile",
+    "dev:android": "npm run android -w @lotto/mobile",
+    "build:android": "npm run build:android -w @lotto/mobile",
+    "install:android": "npm run install:android -w @lotto/mobile",
+    "test": "npm run test -w @lotto/api && npm run test -w @lotto/web && npm run test -w @lotto/mobile",
     "build": "npm run build -w @lotto/web",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
